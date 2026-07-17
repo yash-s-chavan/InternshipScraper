@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Internship Scraper — Morning Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <header id="dashboard-header">
+    <!-- TODO: App name + today's date -->
+    <!-- TODO: Stats bar: X new listings | Y approved | Z skipped -->
+    <!-- TODO: "Re-scrape" button -->
+    <!-- TODO: "Add Repo" button → opens modal -->
+  </header>
+
+  <!-- ===== MAIN LAYOUT ===== -->
+  <main id="main-layout">
+
+    <!-- LEFT PANEL: New Listings -->
+    <section id="listings-panel">
+      <!-- TODO: Filter bar (by tier, location, company size) -->
+      <!-- TODO: Listing cards injected here by app.js -->
+      <!-- Each card shows:
+            - Company name + logo placeholder
+            - Role title
+            - Location (highlight preferred cities)
+            - Match score badge (🔥 ✅ 🟡 ⚪)
+            - Skills matched chips
+            - Date posted
+            - Source repo tag
+            - Apply button (opens link in new tab)
+            - ✅ Add to Sheet  |  ❌ Skip  buttons
+      -->
+    </section>
+
+    <!-- RIGHT PANEL: Pipeline / Stats -->
+    <section id="pipeline-panel">
+      <!-- TODO: Tab bar: "Pipeline" | "Stats" -->
+
+      <!-- Pipeline tab: table of all approved listings -->
+      <!-- Stats tab: charts for match tiers, locations, repos -->
+    </section>
+
+  </main>
+
+  <!-- ===== ADD REPO MODAL ===== -->
+  <div id="add-repo-modal" class="modal hidden">
+    <!-- TODO: Input for GitHub URL (e.g. https://github.com/owner/repo) -->
+    <!-- TODO: Submit button → POST /api/add-repo -->
+  </div>
+
+  <!-- ===== TOAST NOTIFICATIONS ===== -->
+  <div id="toast-container"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

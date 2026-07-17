@@ -1,0 +1,24 @@
+/*
+  style.css
+  ---------
+  Premium dark-mode dashboard styles for the Internship Scraper.
+
+  Design system:
+  - Color palette: deep navy bg, electric indigo accents, glassmorphism cards
+  - Typography: Inter (Google Fonts)
+  - Animations: card entrance, hover lifts, toast slide-ins, score badge pulse
+  - Layout: CSS Grid two-panel (listings left, pipeline right)
+
+  TODO: Import Inter from Google Fonts
+  TODO: Define CSS custom properties (--bg, --surface, --accent, --text, --muted)
+  TODO: Style dashboard header + stats bar
+  TODO: Style listing cards (glassmorphism, hover lift, match tier color coding)
+  TODO: Style skill chips (colored by match/no-match)
+  TODO: Style match score badge with tier colors
+  TODO: Style filter bar dropdowns
+  TODO: Style pipeline panel table
+  TODO: Style modal (backdrop blur, slide-in animation)
+  TODO: Style toast notifications (slide in from bottom-right)
+  TODO: Add smooth entrance animations for cards (staggered fade-up)
+  TODO: Responsive breakpoints for smaller screens
+*/

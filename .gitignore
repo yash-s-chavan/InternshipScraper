@@ -1,0 +1,31 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Database (local only, not shared)
+db/tracker.db
+
+# Credentials and secrets — NEVER commit these
+credentials.json
+config.json
+.env
+
+# Resume (personal file)
+resume.pdf
+
+# Skills cache (auto-generated)
+skills_cache.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
