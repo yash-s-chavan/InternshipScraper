@@ -13,6 +13,7 @@ import webbrowser
 from threading import Timer
 
 from flask import Flask, jsonify, render_template, request
+from flask_cors import CORS
 
 from db.database import (
     get_all_seen,
@@ -101,6 +102,7 @@ def run_pipeline(config: dict) -> None:
 # Flask app
 # ---------------------------------------------------------------------------
 app = Flask(__name__)
+CORS(app, origins=['http://localhost:5173'])  # Vite dev server
 
 
 @app.route("/")
