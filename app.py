@@ -102,7 +102,7 @@ def run_pipeline(config: dict) -> None:
 # Flask app
 # ---------------------------------------------------------------------------
 app = Flask(__name__)
-CORS(app, origins=['http://localhost:5173'])  # Vite dev server
+CORS(app, origins=['http://localhost:5173', 'http://localhost:5001'])  # Vite dev server
 
 
 @app.route("/")
@@ -257,7 +257,7 @@ if __name__ == "__main__":
     run_pipeline(config)
 
     # Open browser after a short delay to let Flask start
-    Timer(1.2, lambda: webbrowser.open("http://localhost:5000")).start()
+    Timer(1.2, lambda: webbrowser.open("http://localhost:5001")).start()
 
-    logger.info("Starting Flask on http://localhost:5000")
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    logger.info("Starting Flask on http://localhost:5001")
+    app.run(host="0.0.0.0", port=5001, debug=False)
