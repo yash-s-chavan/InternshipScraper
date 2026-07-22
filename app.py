@@ -26,6 +26,7 @@ from db.database import (
     mark_skipped,
 )
 from engine.matcher import score_listings
+from engine.pre_filter import pre_filter
 from engine.skill_extractor import get_skills
 from scraper.github_scraper import scrape_all
 from sheets.google_sheets import check_duplicate, get_all_rows, push_listing
@@ -65,7 +66,7 @@ _user_skills:  list = []   # skills extracted from resume
 
 def run_pipeline(config: dict) -> None:
     """
-    Full scrape → skill extract → score → filter pipeline.
+    Full scrape → pre-filter → skill extract → score → filter pipeline.
     Populates _new_listings with listings the user hasn't seen before.
     """
     global _new_listings, _user_skills
@@ -76,21 +77,28 @@ def run_pipeline(config: dict) -> None:
     raw = scrape_all(config)
     logger.info(f"Scraped {len(raw)} total listings")
 
-    # 2. Filter out already-seen listings
-    unseen = [l for l in raw if not is_seen(l["id"])]
-    logger.info(f"{len(unseen)} new (unseen) listings")
+    # 2. Hard disqualifier pre-filter (season, grad-only, non-SWE)
+    filtered_raw, discard_counts = pre_filter(raw, config)
+    logger.info(
+        f"Pre-filter: {len(raw)} → {len(filtered_raw)} kept  "
+        f"(season={discard_counts['season']} grad={discard_counts['grad_only']} "
+        f"non-swe={discard_counts['non_swe']})"
+    )
 
-    # 3. Extract skills from resume
+    # 3. Filter out already-seen listings
+    unseen = [l for l in filtered_raw if not is_seen(l["id"])]
+    logger.info(f"{len(unseen)} new (unseen) listings after pre-filter")
+
+    # 4. Extract skills from resume
     _user_skills = get_skills(config.get("resume_path", "resume.pdf"))
     logger.info(f"User skills ({len(_user_skills)}): {_user_skills}")
 
-    # 4. Score and filter
+    # 5. Score and filter by skill match
     threshold = config.get("skill_match_threshold", 30)
     scored = score_listings(unseen, _user_skills, threshold=threshold)
     logger.info(f"{len(scored)} listings above threshold ({threshold})")
 
-    # 5. Mark all unseen listings as seen in DB (whether above threshold or not)
-    #    so they never reappear — but only persist the scored ones for display
+    # 6. Mark all unseen listings as seen in DB so they never reappear
     for listing in unseen:
         mark_seen(listing)
 

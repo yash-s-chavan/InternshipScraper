@@ -36,12 +36,26 @@ TITLE_KEYWORDS = [
 ]
 
 # Scoring weights
-WEIGHT_SKILL_MATCH = 3.0   # points per matched skill from user's skill set
-WEIGHT_TITLE_KW    = 1.0   # points per title keyword that overlaps with user skills
-SCORE_CAP          = 100
+WEIGHT_SKILL_MATCH  = 3.0   # points per matched skill from user's skill set
+WEIGHT_TITLE_KW     = 1.0   # points per title keyword that overlaps with user skills
+WEIGHT_ROLE_ALIGN   = 2.5   # bonus per SWE-core keyword hit in the role title
+SCORE_CAP           = 100
 
 # Fuzzy threshold for matching skill tokens in a listing's text
 FUZZY_THRESHOLD = 78
+
+# Role alignment — keywords that confirm a role is SWE-core.
+# Each hit in the role title adds WEIGHT_ROLE_ALIGN bonus points (max 2 hits counted).
+SWE_CORE_KEYWORDS = [
+    "software", "engineer", "developer", "swe", "sde",
+    "frontend", "backend", "full stack", "fullstack",
+    "data engineer", "data scientist", "machine learning", "ml engineer",
+    "platform", "devops", "site reliability", "sre",
+    "cloud", "infrastructure", "embedded", "systems",
+    "mobile", "ios", "android", "security", "firmware",
+    "quantitative", "research scientist", "computer vision",
+    "robotics", "simulation", "analytics engineer",
+]
 
 
 def _tokenize(text: str) -> str:
@@ -93,6 +107,16 @@ def _get_tier(score: float) -> str:
     return "⚪ Speculative"
 
 
+def _role_alignment(role: str) -> float:
+    """
+    P2: Return a bonus score for how SWE-aligned the role title is.
+    Checks for SWE_CORE_KEYWORDS, capped at 2 hits to avoid over-rewarding.
+    """
+    r = role.lower()
+    hits = sum(1 for kw in SWE_CORE_KEYWORDS if kw in r)
+    return min(hits, 2) * WEIGHT_ROLE_ALIGN
+
+
 def score_listing(listing: Dict[str, Any], user_skills: List[str]) -> Dict[str, Any]:
     """
     Score a single listing dict against `user_skills`.
@@ -101,31 +125,35 @@ def score_listing(listing: Dict[str, Any], user_skills: List[str]) -> Dict[str, 
         match_tier      - str tier label
         skills_matched  - list of user skills found in the listing
         title_keywords  - list of title keywords matched
+        role_aligned    - bool, True if role is SWE-core
     Returns the enriched listing dict.
     """
-    # Build the text corpus for this listing: role + location
-    # (we don't have a full description, so role title carries most signal)
     corpus = " ".join(filter(None, [
         listing.get("role", ""),
-        listing.get("company", ""),   # some companies hint at their stack
+        listing.get("company", ""),
     ]))
 
     skills_matched = _skills_in_text(corpus, user_skills)
-    title_kws = _title_keywords_present(listing.get("role", ""), user_skills)
+    title_kws      = _title_keywords_present(listing.get("role", ""), user_skills)
+    role_bonus     = _role_alignment(listing.get("role", ""))
 
-    # Raw score
-    raw = (len(skills_matched) * WEIGHT_SKILL_MATCH) + (len(title_kws) * WEIGHT_TITLE_KW)
+    # Raw score: skill hits + title keywords + role alignment bonus
+    raw = (
+        len(skills_matched) * WEIGHT_SKILL_MATCH
+        + len(title_kws)    * WEIGHT_TITLE_KW
+        + role_bonus
+    )
 
-    # Normalize: scale against a "perfect" listing having 5 skill hits + 3 title kws
-    # This keeps scores in a sensible 0-100 range without hard-coding maximums
-    normalizer = (5 * WEIGHT_SKILL_MATCH) + (3 * WEIGHT_TITLE_KW)
+    # Normalizer: "perfect" listing = 5 skill hits + 3 title kws + 2 role alignment hits
+    normalizer = (5 * WEIGHT_SKILL_MATCH) + (3 * WEIGHT_TITLE_KW) + (2 * WEIGHT_ROLE_ALIGN)
     score = min(int((raw / normalizer) * 100), SCORE_CAP)
 
     listing = listing.copy()
-    listing["match_score"] = score
-    listing["match_tier"] = _get_tier(score)
+    listing["match_score"]    = score
+    listing["match_tier"]     = _get_tier(score)
     listing["skills_matched"] = skills_matched
     listing["title_keywords"] = title_kws
+    listing["role_aligned"]   = role_bonus > 0
 
     return listing
 

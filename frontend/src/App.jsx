@@ -149,7 +149,7 @@ export default function App() {
             className={`nav-item ${view === VIEWS.LIVE ? 'active' : ''}`}
             onClick={() => setView(VIEWS.LIVE)}
           >
-            <span className="nav-icon">🚀</span>
+            <span className="nav-icon">◈</span>
             Live Pipeline
             {listings.length > 0 && (
               <span className="nav-badge">{listings.length}</span>
@@ -179,7 +179,7 @@ export default function App() {
             className={`nav-item ${view === VIEWS.STATS ? 'active' : ''}`}
             onClick={() => setView(VIEWS.STATS)}
           >
-            <span className="nav-icon">📊</span>
+            <span className="nav-icon">▦</span>
             Statistics
           </button>
 
@@ -238,7 +238,7 @@ export default function App() {
                 </div>
                 <div className="content-tools">
                   <div className="search-box">
-                    <span className="search-icon">🔍</span>
+                    <span className="search-icon">⌕</span>
                     <input
                       id="search-input"
                       type="text"
@@ -273,8 +273,8 @@ export default function App() {
                 </div>
               ) : currentData.length === 0 ? (
                 <div className="state-center">
-                  <div className="state-icon">
-                    {view === VIEWS.LIVE ? '🎉' : view === VIEWS.APPROVED ? '📋' : '🗂️'}
+                  <div className="state-icon-text">
+                    {view === VIEWS.LIVE ? 'All clear' : '--'}
                   </div>
                   <div className="state-title">
                     {view === VIEWS.LIVE

@@ -90,7 +90,6 @@ export default function ListingRow({ listing, onAction, showActions = true }) {
       {/* Location */}
       <td>
         <div className="location-cell">
-          <span className="pin">📍</span>
           <span className={preferred ? 'preferred' : ''}>
             {listing.location || '—'}
           </span>
@@ -125,7 +124,7 @@ export default function ListingRow({ listing, onAction, showActions = true }) {
                 onClick={() => handleAction('approve')}
                 disabled={busy}
               >
-                ✓ Add
+                Add
               </button>
               <button
                 id={`skip-${listing.id}`}
@@ -133,7 +132,7 @@ export default function ListingRow({ listing, onAction, showActions = true }) {
                 onClick={() => handleAction('skip')}
                 disabled={busy}
               >
-                ✕
+                Skip
               </button>
             </>
           )}
