@@ -8,7 +8,6 @@ export default function AddRepoModal({ onClose, onAdded }) {
   async function handleSubmit(e) {
     e.preventDefault()
     if (!url.trim()) return
-
     setLoading(true)
     try {
       const res = await fetch('/api/add-repo', {
@@ -34,11 +33,12 @@ export default function AddRepoModal({ onClose, onAdded }) {
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-box">
-        <h2>➕ Add Repo</h2>
-        <p>Paste any GitHub internship repo URL and we'll scrape + score it immediately.</p>
+        <h2>Add Repo</h2>
+        <p>Paste a GitHub internship repo URL. It will be scraped and scored immediately.</p>
         <form onSubmit={handleSubmit}>
           <input
             id="add-repo-input"
+            className="modal-input"
             type="url"
             placeholder="https://github.com/owner/repo"
             value={url}
@@ -46,10 +46,10 @@ export default function AddRepoModal({ onClose, onAdded }) {
             autoFocus
           />
           <div className="modal-actions">
-            <button type="button" className="btn btn-ghost" onClick={onClose} disabled={loading}>
+            <button type="button" className="btn btn-outline" onClick={onClose} disabled={loading}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" disabled={loading || !url.trim()}>
+            <button type="submit" className="btn btn-orange" disabled={loading || !url.trim()}>
               {loading ? 'Scraping…' : 'Add Repo'}
             </button>
           </div>

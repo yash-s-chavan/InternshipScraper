@@ -1,48 +1,59 @@
 import { useState, useEffect, useMemo } from 'react'
-import ListingCard from './ListingCard'
-import RightPanel from './RightPanel'
+import ListingRow from './ListingRow'
 import AddRepoModal from './AddRepoModal'
 import { ToastContainer, showToast } from './Toast'
 import './index.css'
 
-const TIERS = ['All Tiers', '🔥 Strong', '✅ Good', '🟡 Partial', '⚪ Speculative']
+const VIEWS = {
+  LIVE:       'live',
+  APPROVED:   'approved',
+  SKIPPED:    'skipped',
+  STATS:      'stats',
+}
 
 export default function App() {
-  const [listings, setListings]     = useState([])
-  const [stats, setStats]           = useState({ total: 0, approved: 0, skipped: 0, pending: 0 })
-  const [skills, setSkills]         = useState([])
-  const [loading, setLoading]       = useState(true)
-  const [showModal, setShowModal]   = useState(false)
+  const [view, setView]           = useState(VIEWS.LIVE)
+  const [listings, setListings]   = useState([])
+  const [approved, setApproved]   = useState([])
+  const [skipped, setSkipped]     = useState([])
+  const [stats, setStats]         = useState({ total: 0, approved: 0, skipped: 0, pending: 0 })
+  const [skills, setSkills]       = useState([])
+  const [loading, setLoading]     = useState(true)
+  const [showModal, setShowModal] = useState(false)
+  const [search, setSearch]       = useState('')
+  const [tierFilter, setTierFilter] = useState('all')
 
-  // Filters
-  const [tierFilter, setTierFilter]       = useState('All Tiers')
-  const [locationFilter, setLocationFilter] = useState('all')
-  const [search, setSearch]               = useState('')
-
-  useEffect(() => {
-    loadAll()
-  }, [])
+  useEffect(() => { loadAll() }, [])
 
   async function loadAll() {
     setLoading(true)
     try {
-      const [listRes, statRes] = await Promise.all([
+      const [listRes, statRes, pipeRes] = await Promise.all([
         fetch('/api/listings'),
         fetch('/api/stats'),
+        fetch('/api/pipeline'),
       ])
-      const listData = await listRes.json()
-      const statData = await statRes.json()
+      const [listData, statData, pipeData] = await Promise.all([
+        listRes.json(),
+        statRes.json(),
+        pipeRes.json(),
+      ])
       setListings(listData)
       setStats(statData)
+      setApproved(pipeData.approved || [])
 
-      // Extract skills from first listing's source data (passed via Flask template vars)
-      // We read them from a meta tag injected by Flask
+      // Pull skipped from DB — we'll reuse pipeline endpoint skipped key
+      // For now fetch all seen with a dedicated call
+      const skippedRes = await fetch('/api/listings/skipped')
+      if (skippedRes.ok) setSkipped(await skippedRes.json())
+
+      // Extract skills from first listing (they all share same user)
       const skillMeta = document.getElementById('user-skills')
       if (skillMeta) {
-        try { setSkills(JSON.parse(skillMeta.dataset.skills || '[]')) } catch { /* skip */ }
+        try { setSkills(JSON.parse(skillMeta.dataset.skills || '[]')) } catch {}
       }
     } catch {
-      showToast('Failed to load listings', 'error')
+      showToast('Failed to load data', 'error')
     } finally {
       setLoading(false)
     }
@@ -50,15 +61,20 @@ export default function App() {
 
   function handleAction(id) {
     setListings(prev => prev.filter(l => l.id !== id))
-    setStats(prev => ({ ...prev, pending: Math.max(0, prev.pending - 1) }))
+    // Refresh stats + pipeline after a moment
+    setTimeout(() => {
+      fetch('/api/stats').then(r => r.json()).then(setStats)
+      fetch('/api/pipeline').then(r => r.json()).then(d => setApproved(d.approved || []))
+    }, 400)
   }
 
-  const filtered = useMemo(() => {
+  const filteredListings = useMemo(() => {
     return listings.filter(l => {
-      if (tierFilter !== 'All Tiers' && !l.match_tier?.includes(tierFilter.replace(/[🔥✅🟡⚪]\s*/g, ''))) return false
-      if (locationFilter === 'preferred') {
-        const preferred = ['philadelphia','pa','bellevue','wa','seattle','dallas','tx','remote','new york','ny','san francisco','ca']
-        if (!preferred.some(p => l.location?.toLowerCase().includes(p))) return false
+      if (tierFilter !== 'all') {
+        const score = l.match_score
+        if (tierFilter === 'strong'  && score < 75) return false
+        if (tierFilter === 'good'    && (score < 50 || score >= 75)) return false
+        if (tierFilter === 'partial' && (score < 30 || score >= 50)) return false
       }
       if (search) {
         const q = search.toLowerCase()
@@ -66,127 +82,251 @@ export default function App() {
       }
       return true
     })
-  }, [listings, tierFilter, locationFilter, search])
+  }, [listings, tierFilter, search])
 
-  const today = new Date().toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric'
-  })
+  const currentData = view === VIEWS.LIVE
+    ? filteredListings
+    : view === VIEWS.APPROVED
+      ? approved.filter(l => l.company?.toLowerCase().includes(search.toLowerCase()) || l.role?.toLowerCase().includes(search.toLowerCase()))
+      : view === VIEWS.SKIPPED
+        ? skipped.filter(l => l.company?.toLowerCase().includes(search.toLowerCase()) || l.role?.toLowerCase().includes(search.toLowerCase()))
+        : []
+
+  const viewMeta = {
+    [VIEWS.LIVE]:     { title: 'Live Pipeline', sub: 'New listings scored against your resume — approve or skip each one.' },
+    [VIEWS.APPROVED]: { title: 'Approved Listings', sub: 'Roles you\'ve approved and pushed to your Google Sheet.' },
+    [VIEWS.SKIPPED]:  { title: 'Skipped Listings', sub: 'Roles you\'ve dismissed — they won\'t appear again.' },
+    [VIEWS.STATS]:    { title: 'Statistics', sub: 'Overview of your pipeline activity and extracted skills.' },
+  }
 
   return (
     <>
-      {/* ── Header ── */}
-      <header className="header">
-        <div className="header-brand">
-          <span className="logo">🚀</span>
-          <span className="brand-name">Internship</span>
-          <span className="brand-accent">Scraper</span>
-        </div>
-        <span className="header-date">{today}</span>
+      <div className="app-shell">
 
-        <div className="header-stats">
-          <div className="stat-pill">
-            <strong>{listings.length}</strong> new
+        {/* ── Top Bar ── */}
+        <header className="topbar">
+          <div className="topbar-brand">
+            <span className="brand-name">InternshipScraper</span>
           </div>
-          <div className="stat-pill approved">
-            <strong>{stats.approved}</strong> approved
+          <nav className="topbar-nav">
+            <button
+              className={`topbar-tab ${view === VIEWS.LIVE ? 'active' : ''}`}
+              onClick={() => setView(VIEWS.LIVE)}
+            >
+              Dashboard
+            </button>
+            <button
+              className={`topbar-tab ${view === VIEWS.APPROVED || view === VIEWS.SKIPPED ? 'active' : ''}`}
+              onClick={() => setView(VIEWS.APPROVED)}
+            >
+              History
+            </button>
+            <button
+              className={`topbar-tab ${view === VIEWS.STATS ? 'active' : ''}`}
+              onClick={() => setView(VIEWS.STATS)}
+            >
+              Analytics
+            </button>
+          </nav>
+          <div className="topbar-actions">
+            <button id="refresh-btn" className="btn btn-outline" onClick={loadAll}>
+              ↻ Refresh
+            </button>
+            <button id="add-repo-btn" className="btn btn-orange" onClick={() => setShowModal(true)}>
+              + Add Repo
+            </button>
           </div>
-          <div className="stat-pill skipped">
-            <strong>{stats.skipped}</strong> skipped
-          </div>
-        </div>
+        </header>
 
-        <div className="header-actions">
+        {/* ── Sidebar ── */}
+        <aside className="sidebar">
+          <div className="sidebar-sync">
+            <button className="btn btn-orange" onClick={loadAll}>Sync Repos</button>
+          </div>
+
+          <div className="sidebar-section-label">Pipeline</div>
           <button
-            id="add-repo-btn"
-            className="btn btn-ghost"
-            onClick={() => setShowModal(true)}
+            className={`nav-item ${view === VIEWS.LIVE ? 'active' : ''}`}
+            onClick={() => setView(VIEWS.LIVE)}
           >
-            ＋ Add Repo
+            <span className="nav-icon">🚀</span>
+            Live Pipeline
+            {listings.length > 0 && (
+              <span className="nav-badge">{listings.length}</span>
+            )}
           </button>
           <button
-            id="rescrape-btn"
-            className="btn btn-primary"
-            onClick={loadAll}
+            className={`nav-item ${view === VIEWS.APPROVED ? 'active' : ''}`}
+            onClick={() => setView(VIEWS.APPROVED)}
           >
-            ↻ Refresh
+            <span className="nav-icon">✓</span>
+            Approved
+            {stats.approved > 0 && (
+              <span className="nav-badge">{stats.approved}</span>
+            )}
           </button>
-        </div>
-      </header>
+          <button
+            className={`nav-item ${view === VIEWS.SKIPPED ? 'active' : ''}`}
+            onClick={() => setView(VIEWS.SKIPPED)}
+          >
+            <span className="nav-icon">✕</span>
+            Skipped
+          </button>
 
-      {/* ── Main Layout ── */}
-      <div className="layout">
+          <div className="sidebar-divider" />
 
-        {/* Left: Listings Panel */}
-        <section className="listings-panel">
-          <div className="filter-bar">
-            <span className="filter-label">Filter:</span>
-            <input
-              id="search-input"
-              type="text"
-              placeholder="Search company or role…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-            <select
-              id="tier-filter"
-              value={tierFilter}
-              onChange={e => setTierFilter(e.target.value)}
-            >
-              {TIERS.map(t => <option key={t}>{t}</option>)}
-            </select>
-            <select
-              id="location-filter"
-              value={locationFilter}
-              onChange={e => setLocationFilter(e.target.value)}
-            >
-              <option value="all">All Locations</option>
-              <option value="preferred">Preferred Only</option>
-            </select>
-            <span className="filter-count">{filtered.length} listings</span>
+          <button
+            className={`nav-item ${view === VIEWS.STATS ? 'active' : ''}`}
+            onClick={() => setView(VIEWS.STATS)}
+          >
+            <span className="nav-icon">📊</span>
+            Statistics
+          </button>
+
+          <div className="sidebar-footer">
+            <div className="nav-item" style={{ cursor: 'default', fontSize: '0.72rem', color: 'var(--muted)' }}>
+              V1.0 Active
+            </div>
           </div>
+        </aside>
 
-          {loading ? (
-            <div className="loading-state">
-              <div className="spinner" />
-              <span>Loading listings…</span>
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">🎉</div>
-              <h3>{listings.length === 0 ? "You're all caught up!" : "No matches for those filters"}</h3>
-              <p>
-                {listings.length === 0
-                  ? "All listings have been reviewed. Check back tomorrow or add a new repo."
-                  : "Try broadening your search or filter criteria."}
-              </p>
-            </div>
-          ) : (
-            <div className="listings-scroll">
-              {filtered.map((l, i) => (
-                <div key={l.id} style={{ animationDelay: `${Math.min(i * 40, 400)}ms` }}>
-                  <ListingCard listing={l} onAction={handleAction} />
+        {/* ── Main Content ── */}
+        <main className="main-content">
+          {view === VIEWS.STATS ? (
+            <>
+              <div className="content-header">
+                <div>
+                  <div className="content-title">{viewMeta[view].title}</div>
+                  <div className="content-subtitle">{viewMeta[view].sub}</div>
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
+              </div>
+              <div className="stats-page">
+                <div className="stats-grid">
+                  <div className="stat-card total">
+                    <div className="stat-val">{stats.total}</div>
+                    <div className="stat-lbl">Total Seen</div>
+                  </div>
+                  <div className="stat-card approved">
+                    <div className="stat-val">{stats.approved}</div>
+                    <div className="stat-lbl">Approved</div>
+                  </div>
+                  <div className="stat-card skipped">
+                    <div className="stat-val">{stats.skipped}</div>
+                    <div className="stat-lbl">Skipped</div>
+                  </div>
+                  <div className="stat-card pending">
+                    <div className="stat-val">{stats.pending}</div>
+                    <div className="stat-lbl">Pending Review</div>
+                  </div>
+                </div>
+                {skills.length > 0 && (
+                  <div className="skills-card">
+                    <h3>Your Extracted Skills</h3>
+                    <div className="skills-list">
+                      {skills.map(s => <span key={s} className="skill-pill">{s}</span>)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="content-header">
+                <div>
+                  <div className="content-title">{viewMeta[view].title}</div>
+                  <div className="content-subtitle">{viewMeta[view].sub}</div>
+                </div>
+                <div className="content-tools">
+                  <div className="search-box">
+                    <span className="search-icon">🔍</span>
+                    <input
+                      id="search-input"
+                      type="text"
+                      placeholder="Search roles or companies…"
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
 
-        {/* Right: Pipeline + Stats */}
-        <RightPanel skills={skills} />
+              {view === VIEWS.LIVE && (
+                <div className="filter-strip">
+                  <select
+                    id="tier-filter"
+                    value={tierFilter}
+                    onChange={e => setTierFilter(e.target.value)}
+                  >
+                    <option value="all">All Tiers</option>
+                    <option value="strong">🔥 Strong (75+)</option>
+                    <option value="good">✅ Good (50–74)</option>
+                    <option value="partial">🟡 Partial (30–49)</option>
+                  </select>
+                  <span className="filter-count">{filteredListings.length} listings</span>
+                </div>
+              )}
+
+              {loading ? (
+                <div className="state-center">
+                  <div className="spinner" />
+                  <span style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>Loading…</span>
+                </div>
+              ) : currentData.length === 0 ? (
+                <div className="state-center">
+                  <div className="state-icon">
+                    {view === VIEWS.LIVE ? '🎉' : view === VIEWS.APPROVED ? '📋' : '🗂️'}
+                  </div>
+                  <div className="state-title">
+                    {view === VIEWS.LIVE
+                      ? "You're all caught up"
+                      : view === VIEWS.APPROVED
+                        ? 'No approved listings yet'
+                        : 'No skipped listings'}
+                  </div>
+                  <div className="state-sub">
+                    {view === VIEWS.LIVE
+                      ? 'All listings reviewed. Add a new repo or come back tomorrow.'
+                      : 'Approve listings from the Live Pipeline to see them here.'}
+                  </div>
+                </div>
+              ) : (
+                <div className="table-wrap">
+                  <table className="listing-table">
+                    <thead>
+                      <tr>
+                        <th>Company</th>
+                        <th>Role</th>
+                        <th>Location</th>
+                        <th>Match Score</th>
+                        <th>{view === VIEWS.LIVE ? 'Posted' : 'Date Approved'}</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {currentData.map(l => (
+                        <ListingRow
+                          key={l.id}
+                          listing={l}
+                          onAction={handleAction}
+                          showActions={view === VIEWS.LIVE}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="table-footer">
+                    Showing {currentData.length} {view === VIEWS.LIVE ? 'new' : view} listing{currentData.length !== 1 ? 's' : ''}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </main>
       </div>
 
-      {/* ── Add Repo Modal ── */}
       {showModal && (
-        <AddRepoModal
-          onClose={() => setShowModal(false)}
-          onAdded={loadAll}
-        />
+        <AddRepoModal onClose={() => setShowModal(false)} onAdded={loadAll} />
       )}
-
-      {/* ── Toasts ── */}
       <ToastContainer />
-
-      {/* Skills meta tag (populated by Flask) */}
       <div id="user-skills" data-skills="[]" style={{ display: 'none' }} />
     </>
   )

@@ -1,11 +1,10 @@
 import { useState, useCallback } from 'react'
 
-const toasts = []
-let setToastsGlobal = null
+let _setToasts = null
 
 export function ToastContainer() {
   const [items, setItems] = useState([])
-  setToastsGlobal = setItems
+  _setToasts = setItems
 
   return (
     <div className="toast-container">
@@ -20,14 +19,10 @@ export function ToastContainer() {
 }
 
 export function showToast(message, type = 'info') {
-  const icons = { success: '✅', error: '❌', info: 'ℹ️' }
+  const icons = { success: '✓', error: '✕', info: '→' }
   const id = Date.now()
-  const toast = { id, message, type, icon: icons[type] }
-
-  if (setToastsGlobal) {
-    setToastsGlobal(prev => [...prev, toast])
-    setTimeout(() => {
-      setToastsGlobal(prev => prev.filter(t => t.id !== id))
-    }, 3200)
+  if (_setToasts) {
+    _setToasts(prev => [...prev, { id, message, type, icon: icons[type] }])
+    setTimeout(() => _setToasts(prev => prev.filter(t => t.id !== id)), 3000)
   }
 }

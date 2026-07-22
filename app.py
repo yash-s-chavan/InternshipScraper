@@ -244,6 +244,14 @@ def api_pipeline():
     return jsonify({"approved": approved, "sheet_rows": sheet_rows})
 
 
+@app.route("/api/listings/skipped")
+def api_listings_skipped():
+    """Return all skipped listings from the database."""
+    skipped = get_all_seen(status_filter="skipped")
+    return jsonify(skipped)
+
+
+
 # ---------------------------------------------------------------------------
 # Startup
 # ---------------------------------------------------------------------------
